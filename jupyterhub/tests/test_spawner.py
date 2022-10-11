@@ -17,7 +17,6 @@ import pytest
 from .. import orm
 from .. import spawner as spawnermod
 from ..objects import Hub, Server
-from ..scopes import access_scopes
 from ..spawner import LocalProcessSpawner, Spawner
 from ..user import User
 from ..utils import AnyTimeoutError, new_token, url_path_join
@@ -445,7 +444,7 @@ async def test_spawner_oauth_scopes(app, user):
     await spawner.user.spawn()
     oauth_client = spawner.orm_spawner.oauth_client
     assert sorted(oauth_client.allowed_scopes) == sorted(
-        allowed_scopes + list(access_scopes(oauth_client))
+        allowed_scopes + spawner.oauth_access_scopes
     )
     await spawner.user.stop()
 

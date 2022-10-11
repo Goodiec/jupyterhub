@@ -3,7 +3,6 @@
 # Distributed under the terms of the Modified BSD License.
 import json
 from datetime import datetime
-from unittest import mock
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 
 from oauthlib import oauth2
@@ -242,18 +241,12 @@ class OAuthAuthorizeHandler(OAuthHandler, BaseHandler):
 
         uri, http_method, body, headers = self.extract_oauth_params()
         try:
-            with mock.patch.object(
-                self.oauth_provider.request_validator,
-                "_current_user",
-                self.current_user,
-                create=True,
-            ):
-                (
-                    requested_scopes,
-                    credentials,
-                ) = self.oauth_provider.validate_authorization_request(
-                    uri, http_method, body, headers
-                )
+            (
+                requested_scopes,
+                credentials,
+            ) = self.oauth_provider.validate_authorization_request(
+                uri, http_method, body, headers
+            )
             credentials = self.add_credentials(credentials)
             client = self.oauth_provider.fetch_by_client_id(credentials['client_id'])
             allowed = False
@@ -296,15 +289,12 @@ class OAuthAuthorizeHandler(OAuthHandler, BaseHandler):
             required_scopes = {*scopes.identify_scopes(), *scopes.access_scopes(client)}
             user_scopes |= {"inherit", *required_scopes}
 
-            allowed_scopes, disallowed_scopes = scopes._resolve_requested_scopes(
-                requested_scopes,
-                user_scopes,
-                user=user.orm_user,
-                client=client,
-                db=self.db,
-            )
+            allowed_scopes = requested_scopes.intersection(user_scopes)
+            excluded_scopes = requested_scopes.difference(user_scopes)
+            # TODO: compute lower-level intersection of remaining _expanded_ scopes
+            # (e.g. user has admin:users, requesting read:users!group=x)
 
-            if disallowed_scopes:
+            if excluded_scopes:
                 self.log.warning(
                     f"Service {client.description} requested scopes {','.join(requested_scopes)}"
                     f" for user {self.current_user.name},"
